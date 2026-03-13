@@ -15,9 +15,11 @@
 
 ## 运行方式
 
-release 下载后直接
+最简单的运行方式，release 下载后直接
 
 ```bash
+# 进入下载后的文件夹后
+chmod +x darkforest*​
 ./darkforest*
 ```
 

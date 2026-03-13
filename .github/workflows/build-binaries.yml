@@ -19,17 +19,17 @@ jobs:
             target: x86_64-pc-windows-msvc
             binary_name: darkforest.exe
             artifact_name: darkforest-windows-x86_64
-            archive_name: darkforest-windows-x86_64.zip
+            asset_name: darkforest-windows-x86_64.exe
           - os: macos-14
             target: aarch64-apple-darwin
             binary_name: darkforest
             artifact_name: darkforest-macos-aarch64
-            archive_name: darkforest-macos-aarch64.tar.gz
+            asset_name: darkforest-macos-aarch64
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
             binary_name: darkforest
             artifact_name: darkforest-linux-x86_64
-            archive_name: darkforest-linux-x86_64.tar.gz
+            asset_name: darkforest-linux-x86_64
 
     steps:
       - name: Checkout repository
@@ -43,24 +43,46 @@ jobs:
       - name: Build release binary
         run: cargo build --release --locked --target ${{ matrix.target }}
 
-      - name: Package Windows binary
+      - name: Prepare Windows binary
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Path dist -Force | Out-Null
-          Copy-Item "target/${{ matrix.target }}/release/${{ matrix.binary_name }}" "dist/${{ matrix.binary_name }}"
-          Compress-Archive -Path "dist/${{ matrix.binary_name }}" -DestinationPath "${{ matrix.archive_name }}" -Force
+          Copy-Item "target/${{ matrix.target }}/release/${{ matrix.binary_name }}" "dist/${{ matrix.asset_name }}"
 
-      - name: Package Unix binary
+      - name: Prepare Unix binary
         if: runner.os != 'Windows'
         run: |
           mkdir -p dist
-          cp "target/${{ matrix.target }}/release/${{ matrix.binary_name }}" "dist/${{ matrix.binary_name }}"
-          tar -czf "${{ matrix.archive_name }}" -C dist "${{ matrix.binary_name }}"
+          cp "target/${{ matrix.target }}/release/${{ matrix.binary_name }}" "dist/${{ matrix.asset_name }}"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact_name }}
-          path: ${{ matrix.archive_name }}
+          path: dist/${{ matrix.asset_name }}
           if-no-files-found: error
+
+  release:
+    name: Publish Release Assets
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+
+      - name: Publish GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+          files: |
+            release-assets/**/darkforest-windows-x86_64.exe
+            release-assets/**/darkforest-macos-aarch64
+            release-assets/**/darkforest-linux-x86_64
