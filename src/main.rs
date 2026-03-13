@@ -41,7 +41,7 @@ const DEMO_SHARED_KEY_HEX: &str =
 )]
 struct Cli {
     #[command(subcommand)]
-    command: Command,
+    command: Option<Command>,
 }
 
 #[derive(Subcommand, Debug)]
@@ -129,6 +129,24 @@ struct TuiArgs {
     target: String,
     #[arg(long, default_value_t = false, help = "在界面里显示 dummy 掩护包")]
     show_dummy: bool,
+}
+
+impl Default for TuiArgs {
+    fn default() -> Self {
+        Self {
+            bind: "0.0.0.0:9000".parse().expect("valid default bind address"),
+            broadcast: "255.255.255.255:9000"
+                .parse()
+                .expect("valid default broadcast address"),
+            key: None,
+            name: None,
+            dummy_min_ms: 1_500,
+            dummy_max_ms: 4_500,
+            no_dummy: false,
+            target: "all".to_string(),
+            show_dummy: false,
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -359,13 +377,14 @@ fn main() -> Result<()> {
     let cli = Cli::parse();
 
     match cli.command {
-        Command::GenKey => {
+        Some(Command::GenKey) => {
             println!("{}", generate_key_hex());
             Ok(())
         }
-        Command::Send(args) => send_command(args),
-        Command::Listen(args) => listen_command(args),
-        Command::Tui(args) => tui_command(args),
+        Some(Command::Send(args)) => send_command(args),
+        Some(Command::Listen(args)) => listen_command(args),
+        Some(Command::Tui(args)) => tui_command(args),
+        None => tui_command(TuiArgs::default()),
     }
 }
 
@@ -1087,4 +1106,15 @@ fn unix_timestamp() -> u64 {
         .duration_since(UNIX_EPOCH)
         .expect("system time before unix epoch")
         .as_secs()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn cli_without_args_falls_back_to_default_entry() {
+        let cli = Cli::try_parse_from(["darkforest"]).expect("cli parse succeeds");
+        assert!(cli.command.is_none());
+    }
 }
